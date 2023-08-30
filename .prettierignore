@@ -1,0 +1,30 @@
+# package directories
+node_modules
+
+# Serverless directories
+.serverless
+
+# local config files
+.envrc
+.env
+.nvmrc
+.awsenv
+*.yml
+
+# IDE
+.vscode
+
+# trash
+.DS_store
+.DS_Store
+template.drawio.bak
+
+# DynamoDB Data Local
+**\dynamodb-data
+
+# Webpack bundle
+.webpack
+
+# Coverage
+__tests__/coverage
+coverage

@@ -1,0 +1,32 @@
+# package directories
+node_modules
+jspm_packages
+coverage
+
+# Serverless directories
+.serverless
+
+# VSCode configuration
+.vscode
+
+# local config files
+.envrc
+.env
+.nvmrc
+.awsenv
+.scannerwork
+sonar-project.properties
+
+# IDE
+.vscode
+
+# trash
+.DS_store
+.DS_Store
+template.drawio.bak
+
+# DynamoDB Data Local
+**\dynamodb-data
+
+# Webpack bundle
+.webpack

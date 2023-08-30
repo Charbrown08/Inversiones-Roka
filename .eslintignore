@@ -1,0 +1,11 @@
+node_modules
+dist
+__tests__/coverage
+.serverless
+.webpack
+.awsenv
+**/*.json
+**/*.yml
+**/*.env
+**/*.md
+**/*.sh

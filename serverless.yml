@@ -1,0 +1,192 @@
+app: inversiones-roka
+service: inversiones-roka
+frameworkVersion: '3'
+
+useDotenv: true
+configValidationMode: error
+
+plugins:
+  - serverless-webpack
+  - serverless-iam-roles-per-function
+  - serverless-prune-plugin
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage,'dev'}
+  region: ${env:AWS_REGION}
+  logRetentionInDays: 1
+  memorySize: 128
+  architecture: arm64
+  environment:
+    USER_POOL_ID: !Ref serviceUserPool
+    APP_CLIENT_ID: !Ref serviceUserPoolClient
+    AUTHORIZER: !Ref ApiGatewayAuthorizer
+    REGION: ${self:provider.region}
+  tags:
+    application: ${self:app}
+    stage: ${self:provider.stage}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:DescribeTable
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/Client
+            - arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/Client/index/name-index
+            - arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/Client/index/last_name-index
+
+custom:
+  baseUrl: global-user-id/${opt:stage, 'dev'}/v1
+  prune:
+    automatic: true
+    number: 3
+  webpack:
+    packager: "npm"
+    webpackConfig: "webpack.config.js"
+    includeModules:
+      forceExclude:
+        - "@aws-sdk/client-cognito-identity-provider"
+
+functions:
+  createClient:
+    handler: src/handlers/CreateClient.handler
+    events:
+      - http:
+          path: ${self:custom.baseUrl}/create-client
+          method: post
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+            scopes:
+              - gui/user
+
+
+
+resources:
+  Resources:
+    serviceUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:app}-user-pool-${self:provider.stage}
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+
+    serviceUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:app}-user-pool-client-${self:provider.stage}
+        AllowedOAuthFlows:
+          - client_credentials
+        AllowedOAuthFlowsUserPoolClient: true
+        AllowedOAuthScopes:
+          - gui/admin
+          - gui/user
+        UserPoolId:
+          Ref: serviceUserPool
+        CallbackURLs:
+          - https://localhost:3000
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        GenerateSecret: true
+        SupportedIdentityProviders:
+          - COGNITO
+
+    serviceUserPoolDomain:
+      Type: AWS::Cognito::UserPoolDomain
+      Properties:
+        UserPoolId:
+          Ref: serviceUserPool
+        Domain: ${self:app}-${self:provider.stage}-1
+
+    cognitoResourceServer:
+      Type: AWS::Cognito::UserPoolResourceServer
+      Properties:
+        Identifier: gui
+        Name: INVERSIONES_ROKA
+        Scopes:
+          - ScopeDescription: admin
+            ScopeName: admin
+          - ScopeDescription: user
+            ScopeName: user
+        UserPoolId:
+          Ref: serviceUserPool
+
+    ApiGatewayAuthorizer:
+      DependsOn:
+        - ApiGatewayRestApi
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: gui-authorizer
+        IdentitySource: method.request.header.Authorization
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        Type: COGNITO_USER_POOLS
+        ProviderARNs:
+          - Fn::GetAtt: [serviceUserPool, Arn]
+
+    GatewayResponseDefault4XX:
+      Type: "AWS::ApiGateway::GatewayResponse"
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'${env:CORS_ORIGIN_ALLOWED_URL}'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: "ApiGatewayRestApi"
+        ResponseTemplates:
+          application/json: "{\"message\": \"Invalid Resource\"}"
+
+    GatewayResponseDefault5XX:
+      Type: "AWS::ApiGateway::GatewayResponse"
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'${env:CORS_ORIGIN_ALLOWED_URL}'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+          gatewayresponse.header.Strict-Transport-Security:  "'max-age=31536000;includeSubDomains'"
+        ResponseType: DEFAULT_5XX
+        RestApiId:
+          Ref: "ApiGatewayRestApi"
+
+
+    employeesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: Client
+        AttributeDefinitions:
+          - AttributeName: dni
+            AttributeType: S
+          - AttributeName: name
+            AttributeType: S
+          - AttributeName: last_name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: dni
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        GlobalSecondaryIndexes:
+          - IndexName: name-index
+            KeySchema:
+              - AttributeName: name
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+          - IndexName: last_name-index
+            KeySchema:
+              - AttributeName: last_name
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
