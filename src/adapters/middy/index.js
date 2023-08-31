@@ -8,11 +8,9 @@ import { logMetrics } from '@aws-lambda-powertools/metrics'
 import { logger, metrics } from '@/utils/powertools'
 import validatorMiddleware from './validatorMiddleware'
 import errorHandlerMiddleware from './errorHandlerMiddleware'
-import LogsMiddleware from './logsMiddleware'
 
 const adapter = (handler, eventSchema = {}, contextSchema = {}) =>
   middy(handler)
-    .use(LogsMiddleware())
     .use(httpJsonBodyParser())
     .use(httpEventNormalizer())
     .use(validatorMiddleware({ eventSchema, contextSchema }))

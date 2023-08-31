@@ -5,7 +5,7 @@ import addKeywords from 'ajv-keywords'
 
 import { BadRequestError } from '@/utils/errors'
 
-const ajv = new Ajv({ allErrors: true, removeAdditional: false, keywords: true, verbose: true })
+const ajv = new Ajv({ allErrors: true, removeAdditional: true, keywords: true, verbose: true })
 addFormats(ajv)
 addCustomErrors(ajv)
 addKeywords(ajv, 'transform')
